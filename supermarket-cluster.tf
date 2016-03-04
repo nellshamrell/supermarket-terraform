@@ -4,26 +4,13 @@ provider "aws" {
   region = "${var.region}"
 }
 
+# Setup chef-server
 resource "aws_instance" "chef_server" {
-  ami = "ami-9abea4fb"
-  instance_type = "t2.medium"
+  ami = "${var.ami}"
+  instance_type = "${var.instance_type}"
+  key_name = "${var.key_name}"
   tags {
     Name = "test-chef-server"
   }
-
-  provisioner "local-exec" {
-    command = "curl -L https://www.chef.io/chef/install.sh | sudo bash"
-  }
-
-  provisioner "local-exec" {
-    command = "sudo mkdir -p /var/chef/cache /var/chef/cookbooks"
-  }
-
-  provisioner "local-exec" {
-    command = "wget -qO- https://supermarket.chef.io/cookbooks/chef-server/download | sudo tar xvzC /var/chef/cookbooks"
-  }
-
-  provisioner "local-exec" {
-    command = "for i in {1..5}; do echo \"Welcome $i times\" >> something.txt; done"
-  }
+  security_groups = ["${var.security_group_names}"]
 }

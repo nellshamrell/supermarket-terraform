@@ -6,3 +6,4 @@ variable "region" {
 variable "instance_type" {}
 variable "ami" {}
 variable "key_name" {}
+variable "private_ssh_key_path" {}

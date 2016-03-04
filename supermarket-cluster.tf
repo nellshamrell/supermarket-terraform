@@ -40,4 +40,14 @@ resource "aws_instance" "chef_server" {
     Name = "test-chef-server"
   }
   security_groups = ["${aws_security_group.allow-ssh.name}"]
+
+  provisioner "file" {
+    source = "cookbooks"
+    destination = "/tmp" 
+    connection {
+      type = "ssh"
+      user = "ubuntu"
+      private_key = "${file(\"${var.private_ssh_key_path}\")}"
+    }
+  }
 }

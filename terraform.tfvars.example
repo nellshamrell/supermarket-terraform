@@ -1,2 +1,7 @@
 access_key = "Your AWS Access Key"
 secret_key = "Your AWS Access Key"
+region = "Your AWS region"
+instance_type = "AWS instance type (i.e. t2.micro)"
+ami = "AWS instance AMI"
+key_name = "AWS key pair name (will be used to ssh into AWS instance)"
+security_group_names = "Security group names to assign to instance"

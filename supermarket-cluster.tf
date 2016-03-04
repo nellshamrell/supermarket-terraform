@@ -31,6 +31,18 @@ resource "aws_security_group_rule" "allow_all_egress" {
     security_group_id = "${aws_security_group.allow-ssh.id}"
 }
 
+# This will create the users and organization
+resource "template_file" "chef_bootstrap" {
+  template = "${file("chef_bootstrap.tpl")}"
+
+  vars {
+    chef-server-user = "${var.chef-server-user}"
+    chef-server-user-full-name = "${var.chef-server-user-full-name}"
+    chef-server-user-email = "${var.chef-server-user-email}"
+    chef-server-user-password = "${var.chef-server-user-password}"
+  }
+}
+
 # Setup chef-server
 resource "aws_instance" "chef_server" {
   ami = "${var.ami}"
@@ -41,9 +53,49 @@ resource "aws_instance" "chef_server" {
   }
   security_groups = ["${aws_security_group.allow-ssh.name}"]
 
+  # Uploads all cookbooks needed to install Chef server
   provisioner "file" {
     source = "cookbooks"
     destination = "/tmp" 
+    connection {
+      type = "ssh"
+      user = "ubuntu"
+      private_key = "${file(\"${var.private_ssh_key_path}\")}"
+    }
+  }
+
+  # Render a DNA json file
+  # this will be used to configure the /etc/opscode/chef-server.rb file
+
+  provisioner "remote-exec" {
+        inline = <<EOF
+        cat <<FILE > /tmp/dna.json
+{
+        "chef-server-12": {
+          "api_fqdn": "${self.public_ip}"
+         }
+       }
+FILE
+EOF
+
+    connection {
+      type = "ssh"
+      user = "ubuntu"
+      private_key = "${file(\"${var.private_ssh_key_path}\")}"
+    }
+  }
+
+  provisioner "remote-exec" {
+    inline = [
+      "sudo service iptables stop",
+      "sudo chkconfig iptables off",
+      "curl -LO https://www.chef.io/chef/install.sh && sudo bash ./install.sh -P chefdk -n && rm install.sh",
+      "cd /tmp; sudo chef exec chef-client -z -o chef-server -j /tmp/dna.json",
+      "echo '${template_file.chef_bootstrap.rendered}' > /tmp/bootstrap-chef-server.sh",
+      "chmod +x /tmp/bootstrap-chef-server.sh",
+      "sudo sh /tmp/bootstrap-chef-server.sh"
+    ]
+
     connection {
       type = "ssh"
       user = "ubuntu"

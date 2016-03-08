@@ -22,6 +22,23 @@ resource "aws_security_group_rule" "allow-ssh" {
     security_group_id = "${aws_security_group.allow-ssh.id}"
 }
 
+resource "aws_security_group" "allow-443" {
+  name = "allow-443"
+  tags {
+    Name = "Allow connections over 443"
+  }
+}
+
+resource "aws_security_group_rule" "allow-443" {
+    type = "ingress"
+    from_port = 443
+    to_port = 443
+    protocol = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+    security_group_id = "${aws_security_group.allow-443.id}"
+}
+
+
 resource "aws_security_group_rule" "allow_all_egress" {
     type = "egress"
     from_port = 0
@@ -40,6 +57,8 @@ resource "template_file" "chef_bootstrap" {
     chef-server-user-full-name = "${var.chef-server-user-full-name}"
     chef-server-user-email = "${var.chef-server-user-email}"
     chef-server-user-password = "${var.chef-server-user-password}"
+    chef-server-org-name = "${var.chef-server-org-name}"
+    chef-server-org-full-name = "${var.chef-server-org-full-name}"
   }
 }
 
@@ -51,7 +70,7 @@ resource "aws_instance" "chef_server" {
   tags {
     Name = "test-chef-server"
   }
-  security_groups = ["${aws_security_group.allow-ssh.name}"]
+  security_groups = ["${aws_security_group.allow-ssh.name}", "${aws_security_group.allow-443.name}"]
 
   # Uploads all cookbooks needed to install Chef server
   provisioner "file" {
@@ -101,5 +120,35 @@ EOF
       user = "ubuntu"
       private_key = "${file(\"${var.private_ssh_key_path}\")}"
     }
+  }
+  # Make .chef directory
+  provisioner "local-exec" {
+    command = "mkdir -p .chef" 
+  }
+  # This will download the chef user pem to your local workstation
+  provisioner "local-exec" {
+    command = "scp -oStrictHostKeyChecking=no -i ${var.private_ssh_key_path} ubuntu@${self.public_ip}:${var.chef-server-user}.pem .chef/${var.chef-server-user}.pem"
+  }
+}
+
+# Template to render knife.rb
+resource "template_file" "knife_rb" {
+  template = "${file("knife_rb.tpl")}"
+  vars {
+    chef-server-user = "${var.chef-server-user}"
+    chef-server-fqdn = "${aws_instance.chef_server.public_ip}"
+    organization = "${var.chef-server-org-name}"
+  }
+  # Make .chef/knife.rb file
+  provisioner "local-exec" {
+    command = "echo '${template_file.knife_rb.rendered}' > .chef/knife.rb"
+  }
+  # Fetch Chef Server Certificate
+  provisioner "local-exec" {
+    command = "knife ssl fetch"
+  }
+  # Upload cookbooks to the Chef Server
+  provisioner "local-exec" {
+    command = "knife cookbook upload --all --cookbook-path cookbooks"
   }
 }

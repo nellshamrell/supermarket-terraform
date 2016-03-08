@@ -83,34 +83,14 @@ resource "aws_instance" "chef_server" {
     }
   }
 
-  # Render a DNA json file
-  # this will be used to configure the /etc/opscode/chef-server.rb file
-
-  provisioner "remote-exec" {
-        inline = <<EOF
-        cat <<FILE > /tmp/dna.json
-{
-        "chef-server-12": {
-          "api_fqdn": "${self.public_ip}"
-         }
-       }
-FILE
-EOF
-
-    connection {
-      type = "ssh"
-      user = "ubuntu"
-      private_key = "${file(\"${var.private_ssh_key_path}\")}"
-    }
-  }
-
   provisioner "remote-exec" {
     inline = [
       "sudo service iptables stop",
       "sudo chkconfig iptables off",
       "curl -LO https://www.chef.io/chef/install.sh && sudo bash ./install.sh -P chefdk -n && rm install.sh",
-      "cd /tmp; sudo chef exec chef-client -z -o chef-server -j /tmp/dna.json",
+      "cd /tmp; sudo chef exec chef-client -z -o chef-server",
       "echo '${template_file.chef_bootstrap.rendered}' > /tmp/bootstrap-chef-server.sh",
+      "sudo echo \"api_fqdn ${self.public_ip}\" >> /etc/opscode/chef-server-rb",
       "chmod +x /tmp/bootstrap-chef-server.sh",
       "sudo sh /tmp/bootstrap-chef-server.sh"
     ]

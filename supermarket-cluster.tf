@@ -90,9 +90,10 @@ resource "aws_instance" "chef_server" {
       "curl -LO https://www.chef.io/chef/install.sh && sudo bash ./install.sh -P chefdk -n && rm install.sh",
       "cd /tmp; sudo chef exec chef-client -z -o chef-server",
       "echo '${template_file.chef_bootstrap.rendered}' > /tmp/bootstrap-chef-server.sh",
-      "sudo echo \"api_fqdn ${self.public_ip}\" >> /etc/opscode/chef-server-rb",
       "chmod +x /tmp/bootstrap-chef-server.sh",
-      "sudo sh /tmp/bootstrap-chef-server.sh"
+      "sudo sh /tmp/bootstrap-chef-server.sh",
+      "sudo sed -i 's/api_fqdn.*$/api_fqdn \"${self.public_ip}\"/' /etc/opscode/chef-server.rb",
+      "sudo chef-server-ctl reconfigure"
     ]
 
     connection {

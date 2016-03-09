@@ -167,12 +167,17 @@ resource "aws_instance" "supermarket_server" {
 
   # Make json file for supermarket data bag item
   provisioner "local-exec" {
-    command = "echo ${template_file.supermarket_databag.rendered} > databags/apps/supermarket.json"
+    command = "echo '${template_file.supermarket_databag.rendered}' > databags/apps/supermarket.json"
   }
 
-  # Create supermarket data bag on Chef server
+  # Create the apps data bag on the Chef server
   provisioner "local-exec" {
-    command = "knife data bag from file apps supermarket.json"
+    command = "knife data bag create apps"
+  }
+
+  # Create supermarket data bag item on the Chef server
+  provisioner "local-exec" {
+    command = "knife data bag from file apps databags/apps/supermarket.json"
   }
 }
 

@@ -134,6 +134,15 @@ resource "template_file" "knife_rb" {
   }
 }
 
+# Template for the Supermarket Databag
+resource "template_file" "supermarket_databag" {
+  template = "${file("supermarket_databag.tpl")}"
+
+  vars {
+    chef-server-url = "${aws_instance.chef_server.public_ip}"
+  }
+}
+
 # Sets up VM for Supermarket
 resource "aws_instance" "supermarket_server" {
   depends_on = ["aws_instance.chef_server"]
@@ -149,6 +158,21 @@ resource "aws_instance" "supermarket_server" {
   # Bootstraps Supermarket VM with Chef
   provisioner "local-exec" {
     command = "knife bootstrap ${self.public_ip} -N supermarket-node -x ubuntu --sudo"
+  }
+
+  # Make a data bags directory
+  provisioner "local-exec" {
+    command = "mkdir -p databags/apps"
+  }
+
+  # Make json file for supermarket data bag item
+  provisioner "local-exec" {
+    command = "echo ${template_file.supermarket_databag.rendered} > databags/apps/supermarket.json"
+  }
+
+  # Create supermarket data bag on Chef server
+  provisioner "local-exec" {
+    command = "knife data bag from file apps supermarket.json"
   }
 }
 

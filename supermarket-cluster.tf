@@ -133,3 +133,22 @@ resource "template_file" "knife_rb" {
     command = "knife cookbook upload --all --cookbook-path cookbooks"
   }
 }
+
+# Sets up VM for Supermarket
+resource "aws_instance" "supermarket_server" {
+  depends_on = ["aws_instance.chef_server"]
+  ami = "${var.ami}"
+  instance_type = "${var.instance_type}"
+  key_name = "${var.key_name}"
+  tags {
+    Name = "test-chef-server"
+  }
+  security_groups = ["${aws_security_group.allow-ssh.name}", "${aws_security_group.allow-443.name}"]
+
+
+  # Bootstraps Supermarket VM with Chef
+  provisioner "local-exec" {
+    command = "knife bootstrap ${self.public_ip} -N supermarket-node -x ubuntu --sudo"
+  }
+}
+

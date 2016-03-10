@@ -93,7 +93,8 @@ resource "aws_instance" "chef_server" {
       "chmod +x /tmp/bootstrap-chef-server.sh",
       "sudo sh /tmp/bootstrap-chef-server.sh",
       "sudo sed -i 's/api_fqdn.*$/api_fqdn \"${self.public_ip}\"/' /etc/opscode/chef-server.rb",
-      "sudo chef-server-ctl reconfigure"
+      "sudo chef-server-ctl reconfigure",
+      "sudo chown -R ubuntu /etc/opscode/chef-server.rb"    
     ]
 
     connection {
@@ -150,14 +151,22 @@ resource "aws_instance" "supermarket_server" {
   instance_type = "${var.instance_type}"
   key_name = "${var.key_name}"
   tags {
-    Name = "test-chef-server"
+    Name = "test-supermarket"
   }
   security_groups = ["${aws_security_group.allow-ssh.name}", "${aws_security_group.allow-443.name}"]
+}
 
+resource "null_resource" "supermarket-chef-setup" {
+  depends_on = ["aws_instance.supermarket_server"]
+
+  # Gives some time for the supermarket server to become available for connection
+  provisioner "local-exec" {
+    command = "sleep 30"
+  }
 
   # Bootstraps Supermarket VM with Chef
   provisioner "local-exec" {
-    command = "knife bootstrap ${self.public_ip} -N supermarket-node -x ubuntu --sudo"
+    command = "knife bootstrap ${aws_instance.supermarket_server.public_ip} -N supermarket-node -x ubuntu --sudo"
   }
 
   # Make a data bags directory
@@ -178,6 +187,27 @@ resource "aws_instance" "supermarket_server" {
   # Create supermarket data bag item on the Chef server
   provisioner "local-exec" {
     command = "knife data bag from file apps databags/apps/supermarket.json"
+  }
+}
+
+# Template to add Supermarket as an oc_id application to the Chef Server
+resource "template_file" "oc-id" {
+  template = "${file("oc_id.tpl")}"
+
+  vars {
+    supermarket-ip = "${aws_instance.supermarket_server.public_ip}"
+  }
+
+  provisioner "local-exec" {
+    command = "echo '${template_file.oc-id.rendered}' > oc-id.txt"
+  }
+
+  provisioner "local-exec" {
+    command = "scp oc-id.txt ubuntu@${aws_instance.chef_server.public_ip}:."
+  }
+
+  provisioner "local-exec" {
+    command = "ssh ubuntu@${aws_instance.chef_server.public_ip} 'sudo cat oc-id.txt >> /etc/opscode/chef-server.rb'"
   }
 }
 

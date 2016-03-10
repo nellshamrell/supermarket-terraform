@@ -93,8 +93,8 @@ resource "aws_instance" "chef_server" {
       "chmod +x /tmp/bootstrap-chef-server.sh",
       "sudo sh /tmp/bootstrap-chef-server.sh",
       "sudo sed -i 's/api_fqdn.*$/api_fqdn \"${self.public_ip}\"/' /etc/opscode/chef-server.rb",
+      "sudo chown ubuntu /etc/opscode/chef-server.rb",
       "sudo chef-server-ctl reconfigure",
-      "sudo chown -R ubuntu /etc/opscode/chef-server.rb"    
     ]
 
     connection {
@@ -159,14 +159,9 @@ resource "aws_instance" "supermarket_server" {
 resource "null_resource" "supermarket-chef-setup" {
   depends_on = ["aws_instance.supermarket_server"]
 
-  # Gives some time for the supermarket server to become available for connection
+  # Forces 60 second wait to allow Supermarket server to become available, then bootstraps Supermarket VM with Chef
   provisioner "local-exec" {
-    command = "sleep 30"
-  }
-
-  # Bootstraps Supermarket VM with Chef
-  provisioner "local-exec" {
-    command = "knife bootstrap ${aws_instance.supermarket_server.public_ip} -N supermarket-node -x ubuntu --sudo"
+    command = "sleep 60 && knife bootstrap ${aws_instance.supermarket_server.public_ip} -N supermarket-node -x ubuntu --sudo"
   }
 
   # Make a data bags directory
@@ -209,5 +204,50 @@ resource "template_file" "oc-id" {
   provisioner "local-exec" {
     command = "ssh ubuntu@${aws_instance.chef_server.public_ip} 'sudo cat oc-id.txt >> /etc/opscode/chef-server.rb'"
   }
+
+  provisioner "local-exec" {
+    command = "ssh ubuntu@${aws_instance.chef_server.public_ip} 'sudo chef-server-ctl reconfigure'"
+  }
+}
+
+resource  "null_resource" "update-supermarket-databag" {
+  depends_on = ["template_file.oc-id"]
+
+  # Changes ownership of /etc/opscode/oc-id-applications/supermarket.json on the Chef Server
+  # So it can be pulled down to the local workstation using the ubuntu user
+  provisioner "local-exec" {
+    command = "ssh ubuntu@${aws_instance.chef_server.public_ip} 'sudo chown ubuntu /etc/opscode/oc-id-applications/supermarket.json'"
+  }
+
+  # Pulls down file with supermarket application application id and secret key for oc_id
+  provisioner "local-exec" {
+    command = "scp ubuntu@${aws_instance.chef_server.public_ip}:/etc/opscode/oc-id-applications/supermarket.json ."
+  }   
+
+  # Add comma to the end of the chef_server_url line
+  provisioner = "local-exec" {
+    command = "sed -i '/\"chef_server_url\".*/ s/$/,/' databags/apps/supermarket.json"
+  }
+
+  # Extract uid from supermarket.json (NOTE the comma at the end of the regex)
+  provisioner "local-exec" {
+    command = "grep -Po '\"uid\".*?[^\\]\",' supermarket.json >> uid.txt"
+  }
+
+  # Add uid to supermarket databag
+  provisioner "local-exec" {
+    command = "sed -i \"s/}/$(sed 's:/:\\/:g' uid.txt)/\" databags/apps/supermarket.json"
+  }
+
+  # Extract secret from supermarket.json
+  provisioner "local-exec" {
+    command = "grep -Po '\"secret\".*?[^\\]\"' supermarket.json >> secret.txt"
+  }
+
+  # Add secret to supermarket databag
+  provisioner "local-exec" {
+    command = "sed -i \"s/}/$(sed 's:/:\\/:g' secret.txt)/\" databags/apps/supermarket.json"
+  }
+
 }
 

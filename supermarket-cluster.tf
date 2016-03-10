@@ -219,13 +219,12 @@ resource  "null_resource" "update-supermarket-databag" {
     command = "ssh ubuntu@${aws_instance.chef_server.public_ip} 'sudo chown ubuntu /etc/opscode/oc-id-applications/supermarket.json'"
   }
 
-  # Pulls down file with supermarket application application id and secret key for oc_id
   provisioner "local-exec" {
     command = "scp ubuntu@${aws_instance.chef_server.public_ip}:/etc/opscode/oc-id-applications/supermarket.json ."
   }   
 
   # Add comma to the end of the chef_server_url line
-  provisioner = "local-exec" {
+  provisioner  "local-exec" {
     command = "sed -i '/\"chef_server_url\".*/ s/$/,/' databags/apps/supermarket.json"
   }
 

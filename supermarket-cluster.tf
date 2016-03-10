@@ -248,5 +248,14 @@ resource  "null_resource" "update-supermarket-databag" {
     command = "sed -i \"s/}/$(sed 's:/:\\/:g' secret.txt)/\" databags/apps/supermarket.json"
   }
 
+  # Adds a closing bracket to the end of the data bag file
+  provisioner "local-exec" {
+    command = "echo \"}\" >> databags/apps/supermarket.json"
+  }
+
+  # Uploads the new Supermarket data bag
+  provisioner "local-exec" {
+    command = "knife data bag from file apps databags/apps/supermarket.json"
+  }
 }
 

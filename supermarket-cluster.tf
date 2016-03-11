@@ -211,7 +211,7 @@ resource "template_file" "oc-id" {
 }
 
 resource  "null_resource" "update-supermarket-databag" {
-  depends_on = ["template_file.oc-id"]
+  depends_on = ["template_file.oc-id", "null_resource.supermarket-chef-setup"]
 
   # Changes ownership of /etc/opscode/oc-id-applications/supermarket.json on the Chef Server
   # So it can be pulled down to the local workstation using the ubuntu user
@@ -245,7 +245,7 @@ resource  "null_resource" "update-supermarket-databag" {
 
   # Extract secret from supermarket.json
   provisioner "local-exec" {
-    command = "grep -Po '\"secret\".*?[^\\\\]\"' supermarket.json >> secret.txt"
+    command = "grep -Po '\"secret\".*?[^\\\\]\"(?=,)' supermarket.json > secret.txt"
   }
 
   # Add secret to supermarket databag

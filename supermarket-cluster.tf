@@ -225,27 +225,32 @@ resource  "null_resource" "update-supermarket-databag" {
 
   # Add comma to the end of the chef_server_url line
   provisioner  "local-exec" {
-    command = "sed -i '/\"chef_server_url\".*/ s/$/,/' databags/apps/supermarket.json"
+    command = "perl -pi -e 's/(\"chef_server_url\".*)$/$1,/' databags/apps/supermarket.json"
+  }
+
+  # Remove ending bracket from data bag
+  provisioner "local-exec" {
+    command = "sed -i s/}// databags/apps/supermarket.json"
   }
 
   # Extract uid from supermarket.json (NOTE the comma at the end of the regex)
   provisioner "local-exec" {
-    command = "grep -Po '\"uid\".*?[^\\]\",' supermarket.json >> uid.txt"
+    command = "grep -Po '\"uid\".*?[^\\\\]\",' supermarket.json >> uid.txt"
   }
 
   # Add uid to supermarket databag
   provisioner "local-exec" {
-    command = "sed -i \"s/}/$(sed 's:/:\\/:g' uid.txt)/\" databags/apps/supermarket.json"
+    command = "cat uid.txt >> databags/apps/supermarket.json"
   }
 
   # Extract secret from supermarket.json
   provisioner "local-exec" {
-    command = "grep -Po '\"secret\".*?[^\\]\"' supermarket.json >> secret.txt"
+    command = "grep -Po '\"secret\".*?[^\\\\]\"' supermarket.json >> secret.txt"
   }
 
   # Add secret to supermarket databag
   provisioner "local-exec" {
-    command = "sed -i \"s/}/$(sed 's:/:\\/:g' secret.txt)/\" databags/apps/supermarket.json"
+    command = "cat secret.txt >> databags/apps/supermarket.json"
   }
 
   # Adds a closing bracket to the end of the data bag file

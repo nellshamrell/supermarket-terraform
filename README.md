@@ -44,3 +44,9 @@ Then spin up your cluster!
 ```bash
   $ terraform apply
 ```
+
+When you're done, use this command to destroy your cluster!
+
+```bash
+  $ terraform destroy
+```

@@ -135,15 +135,6 @@ resource "template_file" "knife_rb" {
   }
 }
 
-# Template for the Supermarket Databag
-resource "template_file" "supermarket_databag" {
-  template = "${file("supermarket_databag.tpl")}"
-
-  vars {
-    chef-server-url = "${aws_instance.chef_server.public_ip}"
-  }
-}
-
 # Sets up VM for Supermarket
 resource "aws_instance" "supermarket_server" {
   depends_on = ["aws_instance.chef_server"]
@@ -155,6 +146,18 @@ resource "aws_instance" "supermarket_server" {
   }
   security_groups = ["${aws_security_group.allow-ssh.name}", "${aws_security_group.allow-443.name}"]
 }
+
+# Template for the Supermarket Databag
+resource "template_file" "supermarket_databag" {
+  depends_on = ["aws_instance.supermarket_server"]
+  template = "${file("supermarket_databag.tpl")}"
+
+  vars {
+    chef-server-url = "${aws_instance.chef_server.public_ip}"
+    fqdn = "${aws_instance.supermarket_server.public_ip}"
+  }
+}
+
 
 resource "null_resource" "supermarket-chef-setup" {
   depends_on = ["aws_instance.supermarket_server"]

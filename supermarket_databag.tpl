@@ -1,4 +1,5 @@
 {
   "id": "supermarket",
-  "chef_server_url": "${chef-server-url}"
+  "fqdn": "${fqdn}",
+  "chef_server_url": "https://${chef-server-url}"
 }

@@ -187,6 +187,7 @@ resource "null_resource" "supermarket-chef-setup" {
 
 # Template to add Supermarket as an oc_id application to the Chef Server
 resource "template_file" "oc-id" {
+  depends_on = ["aws_instance.supermarket_server"]
   template = "${file("oc_id.tpl")}"
 
   vars {
@@ -211,7 +212,7 @@ resource "template_file" "oc-id" {
 }
 
 resource  "null_resource" "update-supermarket-databag" {
-  depends_on = ["template_file.oc-id", "null_resource.supermarket-chef-setup"]
+  depends_on = ["aws_instance.supermarket_server", "template_file.oc-id", "null_resource.supermarket-chef-setup"]
 
   # Changes ownership of /etc/opscode/oc-id-applications/supermarket.json on the Chef Server
   # So it can be pulled down to the local workstation using the ubuntu user
@@ -264,3 +265,16 @@ resource  "null_resource" "update-supermarket-databag" {
   }
 }
 
+resource "null_resource" "configure-supermarket-node-run-list" {
+  depends_on = ["aws_instance.supermarket_server", "null_resource.update-supermarket-databag"]
+  provisioner "local-exec" {
+    command = "knife node run_list add supermarket-node 'recipe[supermarket-wrapper::default]'"
+  }
+}
+
+resource "null_resource" "supermarket-node-client" {
+  depends_on = ["aws_instance.supermarket_server", "null_resource.configure-supermarket-node-run-list"]
+  provisioner "local-exec" {
+    command = "ssh ubuntu@${aws_instance.supermarket_server.public_ip} 'sudo chef-client'"
+  }
+}

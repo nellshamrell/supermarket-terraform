@@ -1,4 +1,4 @@
-# Chef Supermarket Terraform Cluster - Proof of Concept
+# This has been deprecated in favor of [tf_supermarket_cluster](https://github.com/nellshamrell/tf_supermarket_cluster)
 
 This is a terraform configuration to spin up a Chef Server and Supermarket Server and configure them so that Supermarket uses the Chef Server for auth.
 

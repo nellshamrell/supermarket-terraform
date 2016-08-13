@@ -25,3 +25,10 @@ default['chef-ingredient'] = {}
 # policyfile, environment, role, etc.
 #
 # default['chef-ingredient']['custom-repo-recipe'] = 'custom_repo::awesome_custom_setup'
+
+# Testing Attributes #
+#
+# Optionally install the mixlib-install gem from source. This ref can be
+# a revision, branch or tag.
+#
+default['chef-ingredient']['mixlib-install']['git_ref'] = nil

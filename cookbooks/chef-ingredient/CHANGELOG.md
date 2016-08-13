@@ -1,3 +1,35 @@
+# v0.19.0
+
+- Remove delivery-cli examples and tests (we now shipit with ChefDK)
+- Set version constraint to ~> 1.1 for installing mixlib-install from Rubygems
+
+# v0.18.5
+
+- [#106](https://github.com/chef-cookbooks/chef-ingredient/pull/106) Limit `remote_file` backups to 1
+- [#110](https://github.com/chef-cookbooks/chef-ingredient/pull/110) Get rid of default: nil warnings
+
+# v0.18.4
+
+- Add `platform_version_compatibility_mode` property to `chef_ingredient` which makes chef-ingredient select packages built for earlier version of a platform during install when a package does not exist for the current platform version.
+
+# v0.18.3
+
+- Add `accept_license` property to `chef_ingredient` which can accept license for Chef products when applicable.
+
+# v0.18.2
+
+- Set version constraint to ~> 1.0 for installing mixlib-install from Rubygems
+
+# v0.18.1
+
+- Bump mixlib-install version to 1.0.6 so unstable channel artifacts won't include metadata.json files.
+
+# v0.18.0
+
+- [#85](https://github.com/chef-cookbooks/chef-ingredient/pull/85) Ability to support unstable channel for all products / platforms.
+- [#90](https://github.com/chef-cookbooks/chef-ingredient/pull/90) Use packages from packages.chef.io instead of package cloud & remove packagecloud repository setup.
+- [#91](https://github.com/chef-cookbooks/chef-ingredient/pull/91) Deprecate chef-ha, chef-marketplace, chef-sync, push-client, push-server in favor of ha, marketplace, sync, push-jobs-client, push-jobs-server.
+
 # v0.17.0
 
 - [#77](https://github.com/chef-cookbooks/chef-ingredient/pull/77) Enable installation of chef and chefdk from unstable

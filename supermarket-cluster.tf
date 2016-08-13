@@ -7,7 +7,7 @@ provider "aws" {
 # Create security group for servers in this cluster
 
 resource "aws_security_group" "allow-ssh" {
-  name = "allow-ssh"
+  name = "nell-allow-ssh"
   tags {
     Name = "Allow All SSH"
   }
@@ -23,7 +23,7 @@ resource "aws_security_group_rule" "allow-ssh" {
 }
 
 resource "aws_security_group" "allow-443" {
-  name = "allow-443"
+  name = "nell-allow-443"
   tags {
     Name = "Allow connections over 443"
   }
@@ -164,7 +164,7 @@ resource "null_resource" "supermarket-chef-setup" {
 
   # Forces 60 second wait to allow Supermarket server to become available, then bootstraps Supermarket VM with Chef
   provisioner "local-exec" {
-    command = "sleep 60 && knife bootstrap ${aws_instance.supermarket_server.public_ip} -N supermarket-node -x ubuntu --sudo"
+    command = "sleep 60 && knife bootstrap --yes -i ${var.private_ssh_key_path} ${aws_instance.supermarket_server.public_ip} -N supermarket-node -x ubuntu --sudo"
   }
 
   # Make a data bags directory
@@ -202,15 +202,15 @@ resource "template_file" "oc-id" {
   }
 
   provisioner "local-exec" {
-    command = "scp oc-id.txt ubuntu@${aws_instance.chef_server.public_ip}:."
+    command = "scp -i ${var.private_ssh_key_path} oc-id.txt ubuntu@${aws_instance.chef_server.public_ip}:."
   }
 
   provisioner "local-exec" {
-    command = "ssh ubuntu@${aws_instance.chef_server.public_ip} 'sudo cat oc-id.txt >> /etc/opscode/chef-server.rb'"
+    command = "ssh -i ${var.private_ssh_key_path} ubuntu@${aws_instance.chef_server.public_ip} 'sudo cat oc-id.txt >> /etc/opscode/chef-server.rb'"
   }
 
   provisioner "local-exec" {
-    command = "ssh ubuntu@${aws_instance.chef_server.public_ip} 'sudo chef-server-ctl reconfigure'"
+    command = "ssh -i ${var.private_ssh_key_path} ubuntu@${aws_instance.chef_server.public_ip} 'sudo chef-server-ctl reconfigure'"
   }
 }
 
@@ -220,11 +220,11 @@ resource  "null_resource" "update-supermarket-databag" {
   # Changes ownership of /etc/opscode/oc-id-applications/supermarket.json on the Chef Server
   # So it can be pulled down to the local workstation using the ubuntu user
   provisioner "local-exec" {
-    command = "ssh ubuntu@${aws_instance.chef_server.public_ip} 'sudo chown ubuntu /etc/opscode/oc-id-applications/supermarket.json'"
+    command = "ssh -i ${var.private_ssh_key_path} ubuntu@${aws_instance.chef_server.public_ip} 'sudo chown ubuntu /etc/opscode/oc-id-applications/supermarket.json'"
   }
 
   provisioner "local-exec" {
-    command = "scp ubuntu@${aws_instance.chef_server.public_ip}:/etc/opscode/oc-id-applications/supermarket.json ."
+    command = "scp -i ${var.private_ssh_key_path} ubuntu@${aws_instance.chef_server.public_ip}:/etc/opscode/oc-id-applications/supermarket.json ."
   }   
 
   # Add comma to the end of the chef_server_url line
@@ -278,6 +278,6 @@ resource "null_resource" "configure-supermarket-node-run-list" {
 resource "null_resource" "supermarket-node-client" {
   depends_on = ["aws_instance.supermarket_server", "null_resource.configure-supermarket-node-run-list"]
   provisioner "local-exec" {
-    command = "ssh ubuntu@${aws_instance.supermarket_server.public_ip} 'sudo chef-client'"
+    command = "ssh -i ${var.private_ssh_key_path} ubuntu@${aws_instance.supermarket_server.public_ip} 'sudo chef-client'"
   }
 }

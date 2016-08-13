@@ -2,7 +2,7 @@
 # Cookbook Name:: chef-server
 # Attributes:: default
 #
-# Copyright:: Copyright (c) 2012-2015 Chef Software, Inc.
+# Copyright:: Copyright (c) 2012-2016 Chef Software, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@
 #
 #
 default['chef-server']['version'] = nil
-default['chef-server']['package-source'] = nil
+default['chef-server']['package_source'] = nil
 
 # The Chef Server must have an API FQDN set.
 # Ref. http://docs.chef.io/install_server_pre.html#hostnames
@@ -27,11 +27,18 @@ default['chef-server']['api_fqdn'] = node['fqdn']
 default['chef-server']['topology'] = 'standalone'
 default['chef-server']['addons'] = []
 
+# Chef Licensing requirements
+# https://docs.chef.io/install_server.html
+# Chef Ingredient parameter
+# https://github.com/chef-cookbooks/chef-ingredient/pull/101
+
+default['chef-server']['accept_license'] = false
+
 #
 # Chef Server Tunables
 #
 # For a complete list see:
-# http://docs.chef.io/server/config_rb_server.html
+# https://docs.chef.io/server/config_rb_server_optional_settings.html
 #
 # Example:
 #

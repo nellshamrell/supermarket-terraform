@@ -53,7 +53,7 @@ module ChefIngredientCookbook
     #
     # Returns the ctl-command for a chef_ingredient resource
     #
-    def ingredient_config_file
+    def ingredient_config_file(product_name)
       ensure_mixlib_install_gem_installed!
 
       PRODUCT_MATRIX.lookup(product_name).config_file
@@ -80,7 +80,15 @@ module ChefIngredientCookbook
     #
     def ensure_mixlib_install_gem_installed!
       node.run_state[:mixlib_install_gem_installed] ||= begin # ~FC001
-        install_gem_from_rubygems('mixlib-install', '0.8.0.alpha.6')
+        if node['chef-ingredient']['mixlib-install']['git_ref']
+          install_gem_from_source(
+            'https://github.com/chef/mixlib-install.git',
+            node['chef-ingredient']['mixlib-install']['git_ref'],
+            'mixlib-install'
+          )
+        else
+          install_gem_from_rubygems('mixlib-install', '~> 1.1')
+        end
 
         require 'mixlib/install'
         require 'mixlib/install/product'
@@ -96,6 +104,46 @@ module ChefIngredientCookbook
       chefgem = Chef::Resource::ChefGem.new(gem_name, run_context)
       chefgem.version(gem_version)
       chefgem.run_action(:install)
+    end
+
+    #
+    # Helper method to install a gem from source at compile time.
+    #
+    def install_gem_from_source(repo_url, git_ref, gem_name = nil)
+      uri = URI.parse(repo_url)
+      repo_basename = ::File.basename(uri.path)
+      repo_name = repo_basename.match(/(?<name>.*)\.git/)[:name]
+      gem_name ||= repo_name
+
+      Chef::Log.debug("Building #{gem_name} gem from source")
+
+      gem_clone_path = ::File.join(Chef::Config[:file_cache_path], repo_name)
+      gem_file_path  = ::File.join(gem_clone_path, "#{gem_name}-*.gem")
+
+      checkout_gem = Chef::Resource::Git.new(gem_clone_path, run_context)
+      checkout_gem.repository(repo_url)
+      checkout_gem.revision(git_ref)
+      checkout_gem.run_action(:sync)
+
+      ::FileUtils.rm_rf gem_file_path
+
+      build_gem = Chef::Resource::Execute.new("build-#{gem_name}-gem", run_context)
+      build_gem.cwd(gem_clone_path)
+      build_gem.command(
+        <<-EOH
+#{::File.join(RbConfig::CONFIG['bindir'], 'gem')} build #{gem_name}.gemspec
+        EOH
+      )
+      build_gem.run_action(:run) if checkout_gem.updated?
+
+      install_gem = Chef::Resource::ChefGem.new(gem_name, run_context)
+      install_gem_file_path = if windows?
+                                Dir.glob(gem_file_path.tr('\\', '/')).first
+                              else
+                                Dir.glob(gem_file_path).first
+                              end
+      install_gem.source(install_gem_file_path)
+      install_gem.run_action(:install) if build_gem.updated?
     end
 
     ########################################################################
@@ -222,6 +270,78 @@ module ChefIngredientCookbook
 
     def windows?
       node['platform_family'] == 'windows'
+    end
+
+    #
+    # Creates a Mixlib::Install instance using the common attributes of
+    # chef_ingredient resource that can be used for querying builds or
+    # generating install scripts.
+    #
+    def installer
+      @installer ||= begin
+        ensure_mixlib_install_gem_installed!
+
+        options = {
+          product_name: new_resource.product_name,
+          channel: new_resource.channel,
+          product_version: new_resource.version,
+          platform_version_compatibility_mode: new_resource.platform_version_compatibility_mode
+        }.tap do |opt|
+          opt[:shell_type] = :ps1 if windows?
+        end
+
+        Mixlib::Install.new(options).detect_platform
+      end
+    end
+
+    #
+    # Returns package installer options with any required
+    # options based on platform
+    #
+    def package_options_with_force
+      options = new_resource.options
+
+      # Ubuntu 10.10 and Debian 6 require the `--force-yes` option
+      # for package installs
+      if (platform?('ubuntu') && node['platform_version'] == '10.04') ||
+         (platform?('debian') && node['platform_version'].start_with?('6'))
+        if options.nil?
+          options = '--force-yes'
+        else
+          options << ' --force-yes'
+        end
+      end
+
+      options
+    end
+
+    #
+    # Checks the deprecated properties of chef-ingredient and prints warning
+    # messages if any of them are being used.
+    #
+    def check_deprecated_properties
+      # Historically we have had chef- and opscode- in front of most of our
+      # packages. But with our move to bintray we have standardized on names
+      # without any prefixes except some products.
+      if !%w(chef-backend chef-server chef-server-ha-provisioning).include?(new_resource.product_name) &&
+         (match = new_resource.product_name.match(/(chef-|opscode-)(?<product_key>.*)/))
+
+        new_product_key = match[:product_key]
+        Chef::Log.warn "product_name '#{new_resource.product_name}' is deprecated and it will be removed in the future versions of chef-ingredient. Use '#{new_product_key}' instead of '#{new_resource.product_name}'."
+        new_resource.product_name(new_product_key)
+      else
+        # We also have a specific case we need to handle for push-client and push-server
+        deprecated_product_names = {
+          'push-client' => 'push-jobs-client',
+          'push-server' => 'push-jobs-server'
+        }
+
+        if deprecated_product_names.keys.include?(new_resource.product_name)
+          new_product_key = deprecated_product_names[new_resource.product_name]
+          Chef::Log.warn "product_name '#{new_resource.product_name}' is deprecated and it will be removed in the future versions of chef-ingredient. Use '#{new_product_key}' instead of '#{new_resource.product_name}'."
+          new_resource.product_name(new_product_key)
+        end
+      end
     end
   end
 end
